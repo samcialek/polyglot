@@ -1,14 +1,33 @@
 #!/usr/bin/env python3
 """
 Polyglot Snippet Generator
-Generates meaningful code snippets in 20+ programming languages.
+Generates meaningful code snippets in weighted programming languages.
 Each snippet is a real algorithm, data structure, or utility implementation.
+
+Language weights:
+  Python 56% | R 20% | JS 5% | TypeScript 4% | Go 3% | Rust 3% | Ruby 3% | C 3% | Java 3%
 """
 
 import random
 import os
 import sys
 from datetime import datetime, timezone
+
+# ---------------------------------------------------------------------------
+# Weighted language selection
+# ---------------------------------------------------------------------------
+
+WEIGHTS = {
+    "python": 56,
+    "r": 20,
+    "javascript": 5,
+    "typescript": 4,
+    "go": 3,
+    "rust": 3,
+    "ruby": 3,
+    "c": 3,
+    "java": 3,
+}
 
 # ---------------------------------------------------------------------------
 # Language definitions: (name, extension, snippets[])
@@ -261,6 +280,914 @@ if __name__ == "__main__":
     dag = {"A": ["B", "C"], "B": ["D"], "C": ["D"], "D": []}
     print(topological_sort(dag))
 '''),
+            ("decorator_patterns", "Decorator patterns showcase", '''
+import functools
+import time
+
+
+def timer(func):
+    """Measure execution time of a function."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        print(f"{func.__name__} took {elapsed:.4f}s")
+        return result
+    return wrapper
+
+
+def memoize(func):
+    """Cache function results based on arguments."""
+    cache = {}
+    @functools.wraps(func)
+    def wrapper(*args):
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
+    return wrapper
+
+
+def retry(max_attempts=3, delay=0.1):
+    """Retry a function on exception."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts:
+                        raise
+                    print(f"Attempt {attempt} failed: {e}. Retrying...")
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+
+@timer
+@memoize
+def fibonacci(n: int) -> int:
+    if n < 2:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+
+if __name__ == "__main__":
+    print(f"fib(30) = {fibonacci(30)}")
+    print(f"fib(30) = {fibonacci(30)}")  # cached — instant
+'''),
+            ("context_managers", "Custom context managers", '''
+import time
+from contextlib import contextmanager
+
+
+class Timer:
+    """Context manager that measures elapsed time."""
+
+    def __init__(self, label: str = "Block"):
+        self.label = label
+        self.elapsed = 0.0
+
+    def __enter__(self):
+        self._start = time.perf_counter()
+        return self
+
+    def __exit__(self, *exc):
+        self.elapsed = time.perf_counter() - self._start
+        print(f"{self.label}: {self.elapsed:.4f}s")
+        return False
+
+
+@contextmanager
+def temp_list():
+    """Yield a temporary list that gets cleared on exit."""
+    data = []
+    try:
+        yield data
+    finally:
+        print(f"Cleaning up {len(data)} items")
+        data.clear()
+
+
+@contextmanager
+def suppress(*exceptions):
+    """Suppress specified exception types."""
+    try:
+        yield
+    except exceptions:
+        pass
+
+
+if __name__ == "__main__":
+    with Timer("Sum computation"):
+        total = sum(range(1_000_000))
+        print(f"Sum: {total}")
+
+    with temp_list() as items:
+        items.extend([1, 2, 3, 4, 5])
+        print(f"Items: {items}")
+
+    with suppress(ZeroDivisionError):
+        result = 1 / 0  # silently suppressed
+    print("Survived division by zero!")
+'''),
+            ("dataclass_patterns", "Dataclass patterns and tricks", '''
+from dataclasses import dataclass, field, asdict
+from typing import Optional
+import json
+
+
+@dataclass(frozen=True)
+class Point:
+    """Immutable 2D point."""
+    x: float
+    y: float
+
+    def distance_to(self, other: "Point") -> float:
+        return ((self.x - other.x) ** 2 + (self.y - other.y) ** 2) ** 0.5
+
+    def __add__(self, other: "Point") -> "Point":
+        return Point(self.x + other.x, self.y + other.y)
+
+
+@dataclass
+class Config:
+    """Nested config with defaults and serialization."""
+    host: str = "localhost"
+    port: int = 8080
+    debug: bool = False
+    tags: list[str] = field(default_factory=list)
+    metadata: dict[str, str] = field(default_factory=dict)
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), indent=2)
+
+    @classmethod
+    def from_json(cls, s: str) -> "Config":
+        return cls(**json.loads(s))
+
+
+@dataclass(order=True)
+class Priority:
+    """Sortable priority wrapper."""
+    priority: int
+    label: str = field(compare=False)
+
+    def __repr__(self):
+        return f"P({self.priority}, {self.label!r})"
+
+
+if __name__ == "__main__":
+    p1, p2 = Point(0, 0), Point(3, 4)
+    print(f"Distance: {p1.distance_to(p2)}")
+    print(f"Sum: {p1 + p2}")
+
+    cfg = Config(host="prod.example.com", port=443, tags=["api", "v2"])
+    print(cfg.to_json())
+
+    tasks = [Priority(3, "low"), Priority(1, "urgent"), Priority(2, "medium")]
+    print(f"Sorted: {sorted(tasks)}")
+'''),
+            ("generator_patterns", "Generator and iterator patterns", '''
+from typing import Iterator, Generator
+import itertools
+
+
+def fibonacci() -> Generator[int, None, None]:
+    """Infinite Fibonacci sequence generator."""
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b
+
+
+def sliding_window(iterable, size: int) -> Generator[tuple, None, None]:
+    """Yield sliding windows of `size` over an iterable."""
+    it = iter(iterable)
+    window = tuple(itertools.islice(it, size))
+    if len(window) == size:
+        yield window
+    for item in it:
+        window = window[1:] + (item,)
+        yield window
+
+
+def flatten(nested) -> Generator:
+    """Recursively flatten any nested iterable (except strings)."""
+    for item in nested:
+        if hasattr(item, "__iter__") and not isinstance(item, (str, bytes)):
+            yield from flatten(item)
+        else:
+            yield item
+
+
+def chunked(iterable, n: int) -> Generator[list, None, None]:
+    """Split iterable into chunks of size n."""
+    it = iter(iterable)
+    while chunk := list(itertools.islice(it, n)):
+        yield chunk
+
+
+if __name__ == "__main__":
+    # First 10 Fibonacci numbers
+    fibs = list(itertools.islice(fibonacci(), 10))
+    print(f"Fibonacci: {fibs}")
+
+    # Sliding window
+    windows = list(sliding_window(range(6), 3))
+    print(f"Windows: {windows}")
+
+    # Flatten nested structure
+    nested = [1, [2, [3, 4], 5], [6, [7, [8]]]]
+    print(f"Flattened: {list(flatten(nested))}")
+
+    # Chunked
+    chunks = list(chunked(range(10), 3))
+    print(f"Chunks: {chunks}")
+'''),
+            ("async_patterns", "Async/await patterns", '''
+import asyncio
+from typing import Any
+
+
+async def fetch_data(url: str, delay: float) -> dict[str, Any]:
+    """Simulate an async HTTP request."""
+    print(f"Fetching {url}...")
+    await asyncio.sleep(delay)
+    return {"url": url, "status": 200, "data": f"Response from {url}"}
+
+
+async def fetch_with_timeout(url: str, timeout: float) -> dict | None:
+    """Fetch with timeout — returns None on timeout."""
+    try:
+        return await asyncio.wait_for(fetch_data(url, 2.0), timeout=timeout)
+    except asyncio.TimeoutError:
+        print(f"Timeout fetching {url}")
+        return None
+
+
+async def fetch_all_concurrent(urls: list[str]) -> list[dict]:
+    """Fetch multiple URLs concurrently using gather."""
+    tasks = [fetch_data(url, i * 0.3) for i, url in enumerate(urls)]
+    return await asyncio.gather(*tasks)
+
+
+async def producer_consumer():
+    """Async producer-consumer pattern with a queue."""
+    queue: asyncio.Queue[int] = asyncio.Queue(maxsize=5)
+
+    async def producer():
+        for i in range(8):
+            await queue.put(i)
+            print(f"Produced: {i}")
+            await asyncio.sleep(0.1)
+        await queue.put(-1)  # sentinel
+
+    async def consumer():
+        while True:
+            item = await queue.get()
+            if item == -1:
+                break
+            print(f"Consumed: {item}")
+            await asyncio.sleep(0.2)
+
+    await asyncio.gather(producer(), consumer())
+
+
+async def main():
+    urls = ["api.example.com/users", "api.example.com/posts", "api.example.com/comments"]
+    results = await fetch_all_concurrent(urls)
+    for r in results:
+        print(f"  {r['url']} -> {r['status']}")
+
+    print("\\nProducer-consumer:")
+    await producer_consumer()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+'''),
+            ("type_system_tricks", "Advanced type hints and protocols", '''
+from typing import Protocol, TypeVar, runtime_checkable
+from dataclasses import dataclass
+
+
+T = TypeVar("T")
+
+
+@runtime_checkable
+class Comparable(Protocol):
+    def __lt__(self, other: "Comparable") -> bool: ...
+    def __eq__(self, other: object) -> bool: ...
+
+
+@runtime_checkable
+class Serializable(Protocol):
+    def to_dict(self) -> dict: ...
+    @classmethod
+    def from_dict(cls, data: dict) -> "Serializable": ...
+
+
+@dataclass(order=True)
+class Temperature:
+    celsius: float
+
+    @property
+    def fahrenheit(self) -> float:
+        return self.celsius * 9 / 5 + 32
+
+    def to_dict(self) -> dict:
+        return {"celsius": self.celsius}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Temperature":
+        return cls(celsius=data["celsius"])
+
+
+def find_min(items: list[T]) -> T | None:
+    """Find minimum using Protocol-based duck typing."""
+    if not items:
+        return None
+    result = items[0]
+    for item in items[1:]:
+        if item < result:
+            result = item
+    return result
+
+
+def serialize_all(items: list[Serializable]) -> list[dict]:
+    return [item.to_dict() for item in items]
+
+
+if __name__ == "__main__":
+    temps = [Temperature(100), Temperature(0), Temperature(37), Temperature(-40)]
+    print(f"Coldest: {find_min(temps)}")
+    print(f"Is Comparable? {isinstance(temps[0], Comparable)}")
+    print(f"Is Serializable? {isinstance(temps[0], Serializable)}")
+    print(f"Serialized: {serialize_all(temps)}")
+'''),
+        ],
+    },
+
+    "r": {
+        "ext": "R",
+        "snippets": [
+            ("statistical_summary", "Statistical summary functions", '''
+# Custom statistical summary functions — beyond base R.
+
+geometric_mean <- function(x) {
+  exp(mean(log(x[x > 0])))
+}
+
+harmonic_mean <- function(x) {
+  n <- length(x[x != 0])
+  n / sum(1 / x[x != 0])
+}
+
+trimmed_summary <- function(x, trim = 0.1) {
+  sorted <- sort(x)
+  n <- length(sorted)
+  lo <- floor(n * trim) + 1
+  hi <- n - floor(n * trim)
+  trimmed <- sorted[lo:hi]
+
+  list(
+    n = length(x),
+    trimmed_n = length(trimmed),
+    mean = mean(trimmed),
+    sd = sd(trimmed),
+    median = median(trimmed),
+    iqr = IQR(trimmed),
+    geometric_mean = geometric_mean(trimmed),
+    harmonic_mean = harmonic_mean(trimmed)
+  )
+}
+
+# Demo with simulated data
+set.seed(42)
+data <- c(rnorm(95, mean = 50, sd = 10), runif(5, 200, 500))  # 5 outliers
+
+cat("=== Raw data summary ===\n")
+print(summary(data))
+
+cat("\n=== Trimmed (10%) summary ===\n")
+result <- trimmed_summary(data, trim = 0.1)
+for (name in names(result)) {
+  cat(sprintf("  %-20s %s\n", paste0(name, ":"), round(result[[name]], 3)))
+}
+'''),
+            ("bootstrap_ci", "Bootstrap confidence intervals", '''
+# Bootstrap confidence intervals — nonparametric inference.
+
+bootstrap_ci <- function(x, stat_fn = mean, n_boot = 10000, alpha = 0.05) {
+  boot_stats <- replicate(n_boot, {
+    sample_idx <- sample(seq_along(x), replace = TRUE)
+    stat_fn(x[sample_idx])
+  })
+
+  list(
+    estimate = stat_fn(x),
+    ci_lower = quantile(boot_stats, alpha / 2),
+    ci_upper = quantile(boot_stats, 1 - alpha / 2),
+    se = sd(boot_stats),
+    bias = mean(boot_stats) - stat_fn(x)
+  )
+}
+
+# Demo: confidence interval for median income
+set.seed(123)
+incomes <- c(rlnorm(200, meanlog = 10.5, sdlog = 0.8))
+
+cat("=== Bootstrap CI for Median Income ===\n")
+result <- bootstrap_ci(incomes, stat_fn = median)
+cat(sprintf("  Median:  $%.0f\n", result$estimate))
+cat(sprintf("  95%% CI:  [$%.0f, $%.0f]\n", result$ci_lower, result$ci_upper))
+cat(sprintf("  SE:      $%.0f\n", result$se))
+cat(sprintf("  Bias:    $%.2f\n", result$bias))
+
+# Compare mean vs trimmed mean
+cat("\n=== Mean vs Trimmed Mean ===\n")
+ci_mean <- bootstrap_ci(incomes, stat_fn = mean)
+ci_trim <- bootstrap_ci(incomes, stat_fn = function(x) mean(x, trim = 0.1))
+cat(sprintf("  Mean:         $%.0f [%.0f, %.0f]\n", ci_mean$estimate, ci_mean$ci_lower, ci_mean$ci_upper))
+cat(sprintf("  Trimmed Mean: $%.0f [%.0f, %.0f]\n", ci_trim$estimate, ci_trim$ci_lower, ci_trim$ci_upper))
+'''),
+            ("bayesian_ab_test", "Bayesian A/B test analysis", '''
+# Bayesian A/B testing with Beta-Binomial conjugate model.
+
+bayesian_ab_test <- function(successes_a, trials_a, successes_b, trials_b,
+                              prior_alpha = 1, prior_beta = 1, n_sim = 100000) {
+  # Posterior distributions (Beta-Binomial conjugate)
+  post_a <- rbeta(n_sim, prior_alpha + successes_a, prior_beta + trials_a - successes_a)
+  post_b <- rbeta(n_sim, prior_alpha + successes_b, prior_beta + trials_b - successes_b)
+
+  # P(B > A)
+  prob_b_better <- mean(post_b > post_a)
+
+  # Lift distribution
+  lift <- (post_b - post_a) / post_a
+
+  list(
+    prob_b_better = prob_b_better,
+    expected_rate_a = mean(post_a),
+    expected_rate_b = mean(post_b),
+    expected_lift = mean(lift),
+    lift_ci = quantile(lift, c(0.025, 0.975)),
+    risk_of_choosing_b = mean(pmax(post_a - post_b, 0))  # expected loss
+  )
+}
+
+# Demo: website conversion test
+set.seed(42)
+# Control: 120 conversions out of 1000
+# Variant: 145 conversions out of 1000
+result <- bayesian_ab_test(120, 1000, 145, 1000)
+
+cat("=== Bayesian A/B Test Results ===\n")
+cat(sprintf("  P(B > A):        %.1f%%\n", result$prob_b_better * 100))
+cat(sprintf("  Rate A:          %.2f%%\n", result$expected_rate_a * 100))
+cat(sprintf("  Rate B:          %.2f%%\n", result$expected_rate_b * 100))
+cat(sprintf("  Expected Lift:   %.1f%%\n", result$expected_lift * 100))
+cat(sprintf("  Lift 95%% CI:     [%.1f%%, %.1f%%]\n",
+            result$lift_ci[1] * 100, result$lift_ci[2] * 100))
+cat(sprintf("  Risk (choose B): %.4f\n", result$risk_of_choosing_b))
+'''),
+            ("causal_inference", "Causal inference with propensity scores", '''
+# Propensity score matching for causal inference — observational data.
+
+simulate_treatment_data <- function(n = 500) {
+  set.seed(42)
+  age <- rnorm(n, 45, 12)
+  income <- rnorm(n, 60000, 15000)
+
+  # Treatment assignment depends on covariates (confounding)
+  logit_p <- -2 + 0.03 * age + 0.00002 * income
+  prob_treat <- plogis(logit_p)
+  treatment <- rbinom(n, 1, prob_treat)
+
+  # Outcome depends on treatment AND covariates
+  outcome <- 100 + 5 * treatment + 0.5 * age + 0.0003 * income + rnorm(n, 0, 10)
+
+  data.frame(age, income, treatment, outcome)
+}
+
+propensity_score_match <- function(df) {
+  # Estimate propensity scores via logistic regression
+  ps_model <- glm(treatment ~ age + income, data = df, family = binomial)
+  df$pscore <- predict(ps_model, type = "response")
+
+  # Naive estimate (biased)
+  naive <- mean(df$outcome[df$treatment == 1]) - mean(df$outcome[df$treatment == 0])
+
+  # IPW estimate (inverse propensity weighting)
+  w1 <- df$treatment / df$pscore
+  w0 <- (1 - df$treatment) / (1 - df$pscore)
+  ipw_ate <- weighted.mean(df$outcome, w1) - weighted.mean(df$outcome, w0)
+
+  # Regression adjustment
+  reg_model <- lm(outcome ~ treatment + age + income, data = df)
+  reg_ate <- coef(reg_model)["treatment"]
+
+  list(
+    naive_ate = naive,
+    ipw_ate = ipw_ate,
+    regression_ate = reg_ate,
+    true_ate = 5  # we know this from simulation
+  )
+}
+
+# Run
+df <- simulate_treatment_data()
+results <- propensity_score_match(df)
+
+cat("=== Causal Inference: Average Treatment Effect ===\n")
+cat(sprintf("  True ATE:       %.2f\n", results$true_ate))
+cat(sprintf("  Naive estimate: %.2f (biased — ignores confounders)\n", results$naive_ate))
+cat(sprintf("  IPW estimate:   %.2f\n", results$ipw_ate))
+cat(sprintf("  Regression adj: %.2f\n", results$regression_ate))
+'''),
+            ("mcmc_sampler", "Metropolis-Hastings MCMC sampler", '''
+# Metropolis-Hastings MCMC sampler for Bayesian posterior estimation.
+
+metropolis_hastings <- function(log_target, init, n_iter = 10000,
+                                 proposal_sd = 1, burn_in = 1000) {
+  samples <- numeric(n_iter)
+  current <- init
+  accepted <- 0
+
+  for (i in seq_len(n_iter)) {
+    proposal <- rnorm(1, current, proposal_sd)
+    log_ratio <- log_target(proposal) - log_target(current)
+
+    if (log(runif(1)) < log_ratio) {
+      current <- proposal
+      accepted <- accepted + 1
+    }
+    samples[i] <- current
+  }
+
+  list(
+    samples = samples[(burn_in + 1):n_iter],
+    acceptance_rate = accepted / n_iter
+  )
+}
+
+# Demo: Estimate posterior of normal mean with known variance
+# Prior: mu ~ N(0, 10^2), Likelihood: x ~ N(mu, 2^2)
+set.seed(42)
+true_mu <- 3.5
+data <- rnorm(50, mean = true_mu, sd = 2)
+
+log_posterior <- function(mu) {
+  log_prior <- dnorm(mu, mean = 0, sd = 10, log = TRUE)
+  log_likelihood <- sum(dnorm(data, mean = mu, sd = 2, log = TRUE))
+  log_prior + log_likelihood
+}
+
+result <- metropolis_hastings(log_posterior, init = 0, n_iter = 20000,
+                               proposal_sd = 0.5, burn_in = 2000)
+
+cat("=== MCMC Posterior Estimation ===\n")
+cat(sprintf("  True mu:         %.2f\n", true_mu))
+cat(sprintf("  Posterior mean:  %.2f\n", mean(result$samples)))
+cat(sprintf("  Posterior SD:    %.2f\n", sd(result$samples)))
+cat(sprintf("  95%% CI:          [%.2f, %.2f]\n",
+            quantile(result$samples, 0.025), quantile(result$samples, 0.975)))
+cat(sprintf("  Acceptance rate: %.1f%%\n", result$acceptance_rate * 100))
+cat(sprintf("  MLE (x-bar):     %.2f\n", mean(data)))
+'''),
+            ("mixed_effects", "Linear mixed effects from scratch", '''
+# Simplified mixed-effects model estimation via EM algorithm.
+# Y_ij = beta0 + beta1*x_ij + b_i + epsilon_ij
+
+simulate_mixed_data <- function(n_groups = 20, obs_per_group = 10) {
+  set.seed(42)
+  beta0 <- 5.0      # fixed intercept
+  beta1 <- 2.0      # fixed slope
+  sigma_b <- 1.5    # random effect SD
+  sigma_e <- 1.0    # residual SD
+
+  group <- rep(1:n_groups, each = obs_per_group)
+  b <- rnorm(n_groups, 0, sigma_b)  # random intercepts
+  x <- rnorm(n_groups * obs_per_group, 0, 1)
+  y <- beta0 + beta1 * x + b[group] + rnorm(length(x), 0, sigma_e)
+
+  data.frame(y = y, x = x, group = group)
+}
+
+estimate_mixed_model <- function(df, max_iter = 50, tol = 1e-6) {
+  # Simple EM for random intercept model
+  groups <- unique(df$group)
+  n_g <- length(groups)
+
+  # Initial estimates
+  sigma2_b <- 1.0
+  sigma2_e <- 1.0
+
+  for (iter in seq_len(max_iter)) {
+    # E-step: estimate random effects
+    b_hat <- numeric(n_g)
+    for (i in seq_along(groups)) {
+      idx <- df$group == groups[i]
+      n_i <- sum(idx)
+      resid_i <- df$y[idx] - mean(df$y)  # simplified
+      b_hat[i] <- (sigma2_b / (sigma2_b + sigma2_e / n_i)) * mean(resid_i)
+    }
+
+    # M-step: update fixed effects via OLS on residuals
+    df$y_adj <- df$y - b_hat[df$group]
+    fit <- lm(y_adj ~ x, data = df)
+
+    # Update variance components
+    resid <- df$y - predict(fit, df) - b_hat[df$group]
+    sigma2_e_new <- mean(resid^2)
+    sigma2_b_new <- max(var(b_hat) - sigma2_e / mean(table(df$group)), 0.01)
+
+    if (abs(sigma2_e_new - sigma2_e) + abs(sigma2_b_new - sigma2_b) < tol) break
+    sigma2_e <- sigma2_e_new
+    sigma2_b <- sigma2_b_new
+  }
+
+  list(
+    beta = coef(fit),
+    sigma_b = sqrt(sigma2_b),
+    sigma_e = sqrt(sigma2_e),
+    random_effects = b_hat,
+    iterations = iter
+  )
+}
+
+# Run
+df <- simulate_mixed_data()
+result <- estimate_mixed_model(df)
+
+cat("=== Mixed Effects Model (EM) ===\n")
+cat(sprintf("  beta0 (true=5.0): %.2f\n", result$beta[1]))
+cat(sprintf("  beta1 (true=2.0): %.2f\n", result$beta[2]))
+cat(sprintf("  sigma_b (true=1.5): %.2f\n", result$sigma_b))
+cat(sprintf("  sigma_e (true=1.0): %.2f\n", result$sigma_e))
+cat(sprintf("  Converged in %d iterations\n", result$iterations))
+'''),
+            ("survival_analysis", "Kaplan-Meier survival estimator", '''
+# Kaplan-Meier survival curve estimation from scratch.
+
+kaplan_meier <- function(time, event) {
+  # Sort by time
+  ord <- order(time)
+  time <- time[ord]
+  event <- event[ord]
+
+  unique_times <- sort(unique(time[event == 1]))
+  n <- length(time)
+
+  surv_prob <- 1.0
+  results <- data.frame(
+    time = numeric(0), n_risk = integer(0),
+    n_event = integer(0), survival = numeric(0),
+    se = numeric(0)
+  )
+
+  var_sum <- 0  # for Greenwood's formula
+  for (t in unique_times) {
+    n_risk <- sum(time >= t)
+    n_event <- sum(time == t & event == 1)
+    hazard <- n_event / n_risk
+    surv_prob <- surv_prob * (1 - hazard)
+
+    if (n_event > 0) {
+      var_sum <- var_sum + n_event / (n_risk * (n_risk - n_event))
+    }
+    se <- surv_prob * sqrt(var_sum)
+
+    results <- rbind(results, data.frame(
+      time = t, n_risk = n_risk, n_event = n_event,
+      survival = surv_prob, se = se
+    ))
+  }
+
+  results$ci_lower <- pmax(results$survival - 1.96 * results$se, 0)
+  results$ci_upper <- pmin(results$survival + 1.96 * results$se, 1)
+  results
+}
+
+# Simulate clinical trial survival data
+set.seed(42)
+n <- 100
+time <- rexp(n, rate = 0.1)              # true survival times
+censor_time <- runif(n, 0, 30)           # censoring times
+observed_time <- pmin(time, censor_time)  # what we observe
+event <- as.integer(time <= censor_time)  # 1 = event, 0 = censored
+
+km <- kaplan_meier(observed_time, event)
+
+cat("=== Kaplan-Meier Survival Estimates ===\n")
+cat(sprintf("  Events: %d / %d (%.0f%% censored)\n",
+            sum(event), n, (1 - mean(event)) * 100))
+cat("\n  Time    At Risk  Events  Survival  95% CI\n")
+cat("  ", strrep("-", 55), "\n", sep = "")
+for (i in seq_len(min(nrow(km), 12))) {
+  cat(sprintf("  %5.1f   %4d     %4d    %.3f     [%.3f, %.3f]\n",
+              km$time[i], km$n_risk[i], km$n_event[i],
+              km$survival[i], km$ci_lower[i], km$ci_upper[i]))
+}
+
+# Median survival time
+median_idx <- which(km$survival <= 0.5)[1]
+if (!is.na(median_idx)) {
+  cat(sprintf("\n  Median survival time: %.1f\n", km$time[median_idx]))
+}
+'''),
+            ("ridge_regression", "Ridge regression with cross-validation", '''
+# Ridge regression with k-fold cross-validation for lambda selection.
+
+ridge_regression <- function(X, y, lambda) {
+  # Closed-form: beta = (X'X + lambda*I)^{-1} X'y
+  p <- ncol(X)
+  XtX <- crossprod(X)
+  Xty <- crossprod(X, y)
+  beta <- solve(XtX + lambda * diag(p), Xty)
+  as.vector(beta)
+}
+
+cv_ridge <- function(X, y, lambdas, k = 5) {
+  n <- nrow(X)
+  folds <- sample(rep(1:k, length.out = n))
+
+  cv_errors <- sapply(lambdas, function(lam) {
+    fold_errors <- sapply(1:k, function(fold) {
+      train <- folds != fold
+      test <- folds == fold
+      beta <- ridge_regression(X[train, , drop = FALSE], y[train], lam)
+      preds <- X[test, , drop = FALSE] %*% beta
+      mean((y[test] - preds)^2)
+    })
+    mean(fold_errors)
+  })
+
+  list(
+    lambdas = lambdas,
+    cv_errors = cv_errors,
+    best_lambda = lambdas[which.min(cv_errors)],
+    min_error = min(cv_errors)
+  )
+}
+
+# Demo: correlated predictors (where ridge excels)
+set.seed(42)
+n <- 200; p <- 10
+Sigma <- outer(1:p, 1:p, function(i, j) 0.7^abs(i - j))
+X <- MASS::mvrnorm(n, mu = rep(0, p), Sigma = Sigma)
+true_beta <- c(3, -2, 0, 0, 1.5, 0, 0, -1, 0, 0.5)
+y <- X %*% true_beta + rnorm(n, 0, 2)
+
+# Cross-validate
+lambdas <- 10^seq(-2, 3, length.out = 50)
+cv_result <- cv_ridge(X, y, lambdas)
+
+cat("=== Ridge Regression with CV ===\n")
+cat(sprintf("  Best lambda: %.4f\n", cv_result$best_lambda))
+cat(sprintf("  CV MSE:      %.4f\n", cv_result$min_error))
+
+# Compare OLS vs Ridge
+ols_beta <- solve(crossprod(X), crossprod(X, y))
+ridge_beta <- ridge_regression(X, y, cv_result$best_lambda)
+
+cat("\n  Coefficient comparison:\n")
+cat(sprintf("  %-6s %8s %8s %8s\n", "Var", "True", "OLS", "Ridge"))
+for (j in 1:p) {
+  cat(sprintf("  X%-5d %8.2f %8.2f %8.2f\n", j, true_beta[j], ols_beta[j], ridge_beta[j]))
+}
+'''),
+            ("time_series_decompose", "Time series seasonal decomposition", '''
+# Classical time series decomposition: trend + seasonal + residual.
+
+decompose_ts <- function(x, period) {
+  n <- length(x)
+
+  # Trend: centered moving average
+  trend <- rep(NA, n)
+  half <- period %/% 2
+  for (i in (half + 1):(n - half)) {
+    if (period %% 2 == 0) {
+      trend[i] <- (0.5 * x[i - half] + sum(x[(i - half + 1):(i + half - 1)]) + 0.5 * x[i + half]) / period
+    } else {
+      trend[i] <- mean(x[(i - half):(i + half)])
+    }
+  }
+
+  # Seasonal: average deviation from trend by position in cycle
+  detrended <- x - trend
+  seasonal <- numeric(n)
+  for (s in 1:period) {
+    idx <- seq(s, n, by = period)
+    seasonal_mean <- mean(detrended[idx], na.rm = TRUE)
+    seasonal[idx] <- seasonal_mean
+  }
+  # Center seasonal component
+  seasonal <- seasonal - mean(seasonal, na.rm = TRUE)
+
+  # Residual
+  residual <- x - trend - seasonal
+
+  list(
+    observed = x,
+    trend = trend,
+    seasonal = seasonal,
+    residual = residual,
+    period = period
+  )
+}
+
+# Demo: simulate monthly data with trend + seasonality
+set.seed(42)
+n <- 120  # 10 years of monthly data
+t <- 1:n
+trend <- 50 + 0.3 * t                        # linear trend
+seasonal <- 10 * sin(2 * pi * t / 12)        # yearly cycle
+noise <- rnorm(n, 0, 3)
+y <- trend + seasonal + noise
+
+result <- decompose_ts(y, period = 12)
+
+cat("=== Time Series Decomposition ===\n")
+cat(sprintf("  Observations: %d (%.0f years)\n", n, n / 12))
+cat(sprintf("  Period: %d months\n", result$period))
+
+# Show a few values
+cat("\n  Month  Observed  Trend    Seasonal  Residual\n")
+for (i in 13:24) {  # year 2
+  cat(sprintf("  %3d    %6.1f   %6.1f    %6.1f    %6.1f\n",
+              i, result$observed[i],
+              ifelse(is.na(result$trend[i]), NA, result$trend[i]),
+              result$seasonal[i],
+              ifelse(is.na(result$residual[i]), NA, result$residual[i])))
+}
+
+cat(sprintf("\n  Residual SD: %.2f (noise was SD=3)\n",
+            sd(result$residual, na.rm = TRUE)))
+'''),
+            ("pca_from_scratch", "PCA implementation from scratch", '''
+# Principal Component Analysis from scratch using eigendecomposition.
+
+pca <- function(X, n_components = NULL) {
+  n <- nrow(X)
+  p <- ncol(X)
+  if (is.null(n_components)) n_components <- min(n, p)
+
+  # Center the data
+  means <- colMeans(X)
+  X_centered <- sweep(X, 2, means)
+
+  # Covariance matrix
+  cov_matrix <- crossprod(X_centered) / (n - 1)
+
+  # Eigendecomposition
+  eig <- eigen(cov_matrix, symmetric = TRUE)
+  values <- eig$values[1:n_components]
+  vectors <- eig$vectors[, 1:n_components, drop = FALSE]
+
+  # Project data
+  scores <- X_centered %*% vectors
+
+  total_var <- sum(eig$values)
+  list(
+    scores = scores,
+    loadings = vectors,
+    eigenvalues = values,
+    variance_explained = values / total_var,
+    cumulative_var = cumsum(values) / total_var,
+    center = means
+  )
+}
+
+# Demo: iris-like simulated data
+set.seed(42)
+n <- 150
+# 3 clusters with correlated features
+mu <- list(c(5, 3.5, 1.4, 0.2), c(6, 2.8, 4.5, 1.3), c(6.5, 3, 5.5, 2))
+X <- do.call(rbind, lapply(1:3, function(k) {
+  MASS::mvrnorm(n/3, mu[[k]], diag(4) * 0.3)
+}))
+colnames(X) <- paste0("V", 1:4)
+
+result <- pca(X, n_components = 4)
+
+cat("=== PCA Results ===\n")
+cat("\nVariance explained:\n")
+for (i in 1:4) {
+  bar <- paste(rep("#", round(result$variance_explained[i] * 40)), collapse = "")
+  cat(sprintf("  PC%d: %5.1f%% %s (cumulative: %.1f%%)\n",
+              i, result$variance_explained[i] * 100, bar,
+              result$cumulative_var[i] * 100))
+}
+
+cat("\nLoadings (first 2 PCs):\n")
+cat(sprintf("  %-4s  %7s  %7s\n", "Var", "PC1", "PC2"))
+for (j in 1:4) {
+  cat(sprintf("  V%-3d  %7.3f  %7.3f\n", j, result$loadings[j, 1], result$loadings[j, 2]))
+}
+'''),
         ],
     },
 
@@ -288,9 +1215,6 @@ log("world"); // only this one fires after 300ms
             ("quick_sort", "Quicksort implementation", '''
 /**
  * In-place quicksort using Lomuto partition scheme.
- * @param {number[]} arr
- * @param {number} lo
- * @param {number} hi
  */
 function quickSort(arr, lo = 0, hi = arr.length - 1) {
   if (lo < hi) {
@@ -353,7 +1277,6 @@ bus.emit("greet", "world");
             ("promise_all", "Promise.all from scratch", '''
 /**
  * Re-implementation of Promise.all for learning purposes.
- * Resolves when all promises resolve; rejects on first rejection.
  */
 function promiseAll(promises) {
   return new Promise((resolve, reject) => {
@@ -404,60 +1327,6 @@ cloned.a[1].b = 99;
 console.log(original.a[1].b); // 2 — unchanged
 console.log(cloned.a[1].b);   // 99
 '''),
-            ("linked_list", "Singly linked list", '''
-/**
- * Singly linked list with push, pop, reverse, and iterator support.
- */
-class ListNode {
-  constructor(value, next = null) {
-    this.value = value;
-    this.next = next;
-  }
-}
-
-class LinkedList {
-  #head = null;
-  #size = 0;
-
-  get length() { return this.#size; }
-
-  push(value) {
-    this.#head = new ListNode(value, this.#head);
-    this.#size++;
-    return this;
-  }
-
-  pop() {
-    if (!this.#head) return undefined;
-    const val = this.#head.value;
-    this.#head = this.#head.next;
-    this.#size--;
-    return val;
-  }
-
-  reverse() {
-    let prev = null, curr = this.#head;
-    while (curr) {
-      const next = curr.next;
-      curr.next = prev;
-      prev = curr;
-      curr = next;
-    }
-    this.#head = prev;
-    return this;
-  }
-
-  *[Symbol.iterator]() {
-    let node = this.#head;
-    while (node) { yield node.value; node = node.next; }
-  }
-}
-
-const list = new LinkedList();
-[1, 2, 3, 4, 5].forEach((v) => list.push(v));
-console.log([...list]);            // [5, 4, 3, 2, 1]
-console.log([...list.reverse()]);  // [1, 2, 3, 4, 5]
-'''),
         ],
     },
 
@@ -481,11 +1350,6 @@ function Err<E>(error: E): Result<never, E> {
 function divide(a: number, b: number): Result<number, string> {
   if (b === 0) return Err("division by zero");
   return Ok(a / b);
-}
-
-function safeSqrt(n: number): Result<number, string> {
-  if (n < 0) return Err("cannot sqrt negative number");
-  return Ok(Math.sqrt(n));
 }
 
 // Usage
@@ -523,8 +1387,6 @@ class MinHeap<T> {
     return top;
   }
 
-  peek(): T | undefined { return this.data[0]; }
-
   private bubbleUp(i: number): void {
     while (i > 0) {
       const parent = (i - 1) >> 1;
@@ -552,7 +1414,6 @@ class MinHeap<T> {
 const heap = new MinHeap<number>();
 [5, 3, 8, 1, 2].forEach((n) => heap.push(n));
 while (heap.size > 0) process.stdout.write(`${heap.pop()} `); // 1 2 3 5 8
-console.log();
 '''),
             ("observer_pattern", "Type-safe Observer pattern", '''
 /**
@@ -574,7 +1435,7 @@ class Observable<EventMap extends Record<string, unknown>> {
   }
 }
 
-// Usage — events are fully typed
+// Usage
 interface AppEvents {
   login: { userId: string; timestamp: number };
   logout: { userId: string };
@@ -582,17 +1443,15 @@ interface AppEvents {
 }
 
 const app = new Observable<AppEvents>();
-
 const unsub = app.on("login", ({ userId, timestamp }) => {
   console.log(`User ${userId} logged in at ${new Date(timestamp).toISOString()}`);
 });
-
 app.emit("login", { userId: "sam", timestamp: Date.now() });
-unsub(); // clean up
+unsub();
 '''),
             ("pipe_function", "Functional pipe and compose", '''
 /**
- * Type-safe pipe and compose utilities for functional programming.
+ * Type-safe pipe utility for functional programming.
  */
 type Fn<A, B> = (a: A) => B;
 
@@ -603,7 +1462,7 @@ function pipe(...fns: Fn<any, any>[]): Fn<any, any> {
   return (x: any) => fns.reduce((acc, fn) => fn(acc), x);
 }
 
-// Demo: transform a string through a pipeline
+// Demo
 const slugify = pipe(
   (s: string) => s.toLowerCase(),
   (s: string) => s.replace(/[^a-z0-9]+/g, "-"),
@@ -611,7 +1470,6 @@ const slugify = pipe(
 );
 
 console.log(slugify("Hello, World! This is TypeScript")); // hello-world-this-is-typescript
-console.log(slugify("  Functional  Programming  101 ")); // functional-programming-101
 '''),
         ],
     },
@@ -629,11 +1487,9 @@ import (
 \t"time"
 )
 
-// worker processes jobs from the jobs channel and sends results to results.
 func worker(id int, jobs <-chan int, results chan<- int, wg *sync.WaitGroup) {
 \tdefer wg.Done()
 \tfor j := range jobs {
-\t\t// Simulate work
 \t\ttime.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
 \t\tfmt.Printf("Worker %d processed job %d\\n", id, j)
 \t\tresults <- j * j
@@ -678,7 +1534,6 @@ import (
 \t"fmt"
 )
 
-// BinarySearch returns the index of target in a sorted slice, or -1.
 func BinarySearch[T cmp.Ordered](arr []T, target T) int {
 \tlo, hi := 0, len(arr)-1
 \tfor lo <= hi {
@@ -697,11 +1552,8 @@ func BinarySearch[T cmp.Ordered](arr []T, target T) int {
 
 func main() {
 \tints := []int{2, 5, 8, 12, 16, 23, 38, 56, 72, 91}
-\tfmt.Println("Index of 23:", BinarySearch(ints, 23)) // 5
-\tfmt.Println("Index of 42:", BinarySearch(ints, 42)) // -1
-
-\tstrs := []string{"alpha", "beta", "delta", "gamma"}
-\tfmt.Println("Index of delta:", BinarySearch(strs, "delta")) // 2
+\tfmt.Println("Index of 23:", BinarySearch(ints, 23))
+\tfmt.Println("Index of 42:", BinarySearch(ints, 42))
 }
 '''),
             ("ring_buffer", "Lock-free ring buffer", '''
@@ -709,7 +1561,6 @@ package main
 
 import "fmt"
 
-// RingBuffer is a fixed-size circular queue.
 type RingBuffer[T any] struct {
 \tbuf   []T
 \tsize  int
@@ -723,9 +1574,7 @@ func NewRingBuffer[T any](capacity int) *RingBuffer[T] {
 }
 
 func (r *RingBuffer[T]) Push(v T) bool {
-\tif r.count == r.size {
-\t\treturn false // full
-\t}
+\tif r.count == r.size { return false }
 \tr.buf[r.tail] = v
 \tr.tail = (r.tail + 1) % r.size
 \tr.count++
@@ -734,29 +1583,22 @@ func (r *RingBuffer[T]) Push(v T) bool {
 
 func (r *RingBuffer[T]) Pop() (T, bool) {
 \tvar zero T
-\tif r.count == 0 {
-\t\treturn zero, false
-\t}
+\tif r.count == 0 { return zero, false }
 \tv := r.buf[r.head]
 \tr.head = (r.head + 1) % r.size
 \tr.count--
 \treturn v, true
 }
 
-func (r *RingBuffer[T]) Len() int { return r.count }
-
 func main() {
 \trb := NewRingBuffer[int](3)
-\trb.Push(10)
-\trb.Push(20)
-\trb.Push(30)
-\tfmt.Println("Full?", !rb.Push(40)) // true
+\trb.Push(10); rb.Push(20); rb.Push(30)
 \tv, _ := rb.Pop()
-\tfmt.Println("Popped:", v) // 10
+\tfmt.Println("Popped:", v)
 \trb.Push(40)
-\tfor rb.Len() > 0 {
+\tfor rb.count > 0 {
 \t\tv, _ := rb.Pop()
-\t\tfmt.Println(v) // 20, 30, 40
+\t\tfmt.Println(v)
 \t}
 }
 '''),
@@ -767,7 +1609,6 @@ func main() {
         "ext": "rs",
         "snippets": [
             ("binary_search", "Binary search implementation", '''
-/// Binary search on a sorted slice. Returns Some(index) or None.
 fn binary_search<T: Ord>(arr: &[T], target: &T) -> Option<usize> {
     let (mut lo, mut hi) = (0, arr.len());
     while lo < hi {
@@ -783,26 +1624,19 @@ fn binary_search<T: Ord>(arr: &[T], target: &T) -> Option<usize> {
 
 fn main() {
     let data = vec![2, 5, 8, 12, 16, 23, 38, 56, 72, 91];
-    println!("Search 23: {:?}", binary_search(&data, &23)); // Some(5)
-    println!("Search 42: {:?}", binary_search(&data, &42)); // None
+    println!("Search 23: {:?}", binary_search(&data, &23));
+    println!("Search 42: {:?}", binary_search(&data, &42));
 }
 '''),
             ("iterator_combinators", "Custom iterator combinators", '''
-/// Generates Fibonacci numbers lazily via an iterator.
-struct Fibonacci {
-    a: u64,
-    b: u64,
-}
+struct Fibonacci { a: u64, b: u64 }
 
 impl Fibonacci {
-    fn new() -> Self {
-        Fibonacci { a: 0, b: 1 }
-    }
+    fn new() -> Self { Fibonacci { a: 0, b: 1 } }
 }
 
 impl Iterator for Fibonacci {
     type Item = u64;
-
     fn next(&mut self) -> Option<Self::Item> {
         let val = self.a;
         (self.a, self.b) = (self.b, self.a + self.b);
@@ -811,11 +1645,9 @@ impl Iterator for Fibonacci {
 }
 
 fn main() {
-    // First 10 Fibonacci numbers
     let fibs: Vec<u64> = Fibonacci::new().take(10).collect();
     println!("Fibonacci: {:?}", fibs);
 
-    // Sum of even Fibonacci numbers below 4 million
     let sum: u64 = Fibonacci::new()
         .take_while(|&n| n < 4_000_000)
         .filter(|n| n % 2 == 0)
@@ -823,15 +1655,13 @@ fn main() {
     println!("Sum of even fibs < 4M: {}", sum);
 }
 '''),
-            ("hashmap_word_count", "Word frequency counter with HashMap", '''
+            ("hashmap_word_count", "Word frequency counter", '''
 use std::collections::HashMap;
 
-/// Count word frequencies in a string, case-insensitive.
 fn word_freq(text: &str) -> HashMap<String, usize> {
     let mut freq = HashMap::new();
     for word in text.split_whitespace() {
-        let clean: String = word
-            .chars()
+        let clean: String = word.chars()
             .filter(|c| c.is_alphanumeric())
             .collect::<String>()
             .to_lowercase();
@@ -845,10 +1675,8 @@ fn word_freq(text: &str) -> HashMap<String, usize> {
 fn main() {
     let text = "the quick brown fox jumps over the lazy dog the fox";
     let freq = word_freq(text);
-
     let mut pairs: Vec<_> = freq.iter().collect();
     pairs.sort_by(|a, b| b.1.cmp(a.1));
-
     for (word, count) in &pairs[..5.min(pairs.len())] {
         println!("{:>8}: {}", word, count);
     }
@@ -861,20 +1689,17 @@ fn main() {
         "ext": "rb",
         "snippets": [
             ("enumerable_extensions", "Enumerable method showcase", '''
-# Demonstrates Ruby\'s powerful Enumerable methods with practical examples.
+# Ruby Enumerable methods with practical examples.
 
 data = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
 
-# Partition into evens and odds
 evens, odds = data.partition(&:even?)
 puts "Evens: #{evens}"
 puts "Odds:  #{odds}"
 
-# Group by magnitude
 grouped = data.group_by { |n| n < 5 ? :small : :large }
 puts "Grouped: #{grouped}"
 
-# Running average using each_with_object
 averages = data.each_with_object([]) do |n, acc|
   prev_sum = acc.empty? ? 0 : acc.last[:sum]
   prev_cnt = acc.empty? ? 0 : acc.last[:count]
@@ -883,17 +1708,15 @@ averages = data.each_with_object([]) do |n, acc|
 end
 puts "Running averages: #{averages.map { |a| a[:avg].round(2) }}"
 
-# Flat map + tally (Ruby 2.7+)
 words = ["hello world", "hello ruby", "world class"]
 freq = words.flat_map { |s| s.split }.tally
 puts "Word freq: #{freq}"
 '''),
             ("linked_list", "Linked list with Enumerable", '''
-# Singly linked list that mixes in Enumerable for free methods.
+# Singly linked list that mixes in Enumerable.
 
 class LinkedList
   include Enumerable
-
   Node = Struct.new(:value, :next_node)
 
   def initialize
@@ -932,10 +1755,10 @@ end
 
 list = LinkedList.new
 [5, 4, 3, 2, 1].each { |n| list.push(n) }
-puts list                          # [1 -> 2 -> 3 -> 4 -> 5]
-puts "Sum:  #{list.sum}"          # 15
-puts "Max:  #{list.max}"          # 5
-puts "Even: #{list.select(&:even?)}" # [2, 4]
+puts list
+puts "Sum:  #{list.sum}"
+puts "Max:  #{list.max}"
+puts "Even: #{list.select(&:even?)}"
 '''),
         ],
     },
@@ -964,50 +1787,30 @@ static unsigned int hash(const char *key) {
     return h % TABLE_SIZE;
 }
 
-HashTable *ht_create(void) {
-    HashTable *ht = calloc(1, sizeof(HashTable));
-    return ht;
-}
+HashTable *ht_create(void) { return calloc(1, sizeof(HashTable)); }
 
 void ht_set(HashTable *ht, const char *key, int value) {
     unsigned int idx = hash(key);
-    for (Entry *e = ht->buckets[idx]; e; e = e->next) {
+    for (Entry *e = ht->buckets[idx]; e; e = e->next)
         if (strcmp(e->key, key) == 0) { e->value = value; return; }
-    }
     Entry *e = malloc(sizeof(Entry));
-    e->key = strdup(key);
-    e->value = value;
-    e->next = ht->buckets[idx];
-    ht->buckets[idx] = e;
+    e->key = strdup(key); e->value = value;
+    e->next = ht->buckets[idx]; ht->buckets[idx] = e;
 }
 
 int ht_get(HashTable *ht, const char *key, int *out) {
-    unsigned int idx = hash(key);
-    for (Entry *e = ht->buckets[idx]; e; e = e->next) {
+    for (Entry *e = ht->buckets[hash(key)]; e; e = e->next)
         if (strcmp(e->key, key) == 0) { *out = e->value; return 1; }
-    }
     return 0;
-}
-
-void ht_free(HashTable *ht) {
-    for (int i = 0; i < TABLE_SIZE; i++) {
-        Entry *e = ht->buckets[i];
-        while (e) { Entry *next = e->next; free(e->key); free(e); e = next; }
-    }
-    free(ht);
 }
 
 int main(void) {
     HashTable *ht = ht_create();
     ht_set(ht, "alice", 42);
     ht_set(ht, "bob", 17);
-    ht_set(ht, "charlie", 99);
-
     int val;
     if (ht_get(ht, "bob", &val)) printf("bob -> %d\\n", val);
     if (!ht_get(ht, "dave", &val)) printf("dave -> not found\\n");
-
-    ht_free(ht);
     return 0;
 }
 '''),
@@ -1017,30 +1820,20 @@ int main(void) {
 #include <string.h>
 #include <math.h>
 
-/**
- * Sieve of Eratosthenes — find all primes up to n.
- * Returns a heap-allocated array; caller must free it.
- */
 int *sieve(int n, int *count) {
     char *is_prime = malloc(n + 1);
     memset(is_prime, 1, n + 1);
     is_prime[0] = is_prime[1] = 0;
-
-    for (int i = 2; i <= (int)sqrt(n); i++) {
-        if (is_prime[i]) {
+    for (int i = 2; i <= (int)sqrt(n); i++)
+        if (is_prime[i])
             for (int j = i * i; j <= n; j += i)
                 is_prime[j] = 0;
-        }
-    }
-
     *count = 0;
     for (int i = 2; i <= n; i++) *count += is_prime[i];
-
     int *primes = malloc(*count * sizeof(int));
     int idx = 0;
-    for (int i = 2; i <= n; i++) {
+    for (int i = 2; i <= n; i++)
         if (is_prime[i]) primes[idx++] = i;
-    }
     free(is_prime);
     return primes;
 }
@@ -1049,116 +1842,9 @@ int main(void) {
     int count;
     int *primes = sieve(100, &count);
     printf("Primes up to 100 (%d total):\\n", count);
-    for (int i = 0; i < count; i++) {
-        printf("%d ", primes[i]);
-    }
+    for (int i = 0; i < count; i++) printf("%d ", primes[i]);
     printf("\\n");
     free(primes);
-    return 0;
-}
-'''),
-        ],
-    },
-
-    "cpp": {
-        "ext": "cpp",
-        "snippets": [
-            ("smart_pointer", "Simplified unique_ptr implementation", '''
-#include <iostream>
-#include <utility>
-
-/**
- * Simplified unique_ptr — demonstrates RAII and move semantics.
- */
-template <typename T>
-class UniquePtr {
-    T *ptr_;
-
-public:
-    explicit UniquePtr(T *p = nullptr) : ptr_(p) {}
-    ~UniquePtr() { delete ptr_; }
-
-    // Move constructor & assignment
-    UniquePtr(UniquePtr &&other) noexcept : ptr_(other.ptr_) { other.ptr_ = nullptr; }
-    UniquePtr &operator=(UniquePtr &&other) noexcept {
-        if (this != &other) { delete ptr_; ptr_ = other.ptr_; other.ptr_ = nullptr; }
-        return *this;
-    }
-
-    // No copies
-    UniquePtr(const UniquePtr &) = delete;
-    UniquePtr &operator=(const UniquePtr &) = delete;
-
-    T &operator*() const { return *ptr_; }
-    T *operator->() const { return ptr_; }
-    T *get() const { return ptr_; }
-    explicit operator bool() const { return ptr_ != nullptr; }
-
-    T *release() { T *p = ptr_; ptr_ = nullptr; return p; }
-    void reset(T *p = nullptr) { delete ptr_; ptr_ = p; }
-};
-
-struct Point { double x, y; };
-
-int main() {
-    UniquePtr<Point> p(new Point{3.0, 4.0});
-    std::cout << "Point(" << p->x << ", " << p->y << ")\\n";
-
-    UniquePtr<Point> q = std::move(p);
-    std::cout << "Moved: p is " << (p ? "valid" : "null")
-              << ", q = (" << q->x << ", " << q->y << ")\\n";
-    return 0;
-}
-'''),
-            ("graph_bfs", "BFS on adjacency list graph", '''
-#include <iostream>
-#include <vector>
-#include <queue>
-#include <unordered_map>
-#include <unordered_set>
-
-using Graph = std::unordered_map<int, std::vector<int>>;
-
-/**
- * Breadth-first search returning the visit order.
- */
-std::vector<int> bfs(const Graph &g, int start) {
-    std::vector<int> order;
-    std::unordered_set<int> visited;
-    std::queue<int> q;
-
-    q.push(start);
-    visited.insert(start);
-
-    while (!q.empty()) {
-        int node = q.front(); q.pop();
-        order.push_back(node);
-        if (g.count(node)) {
-            for (int neighbor : g.at(node)) {
-                if (!visited.count(neighbor)) {
-                    visited.insert(neighbor);
-                    q.push(neighbor);
-                }
-            }
-        }
-    }
-    return order;
-}
-
-int main() {
-    Graph g = {
-        {1, {2, 3}},
-        {2, {4, 5}},
-        {3, {5}},
-        {4, {}},
-        {5, {6}},
-        {6, {}},
-    };
-
-    auto order = bfs(g, 1);
-    std::cout << "BFS order: ";
-    for (int n : order) std::cout << n << " ";
-    std::cout << "\\n";
     return 0;
 }
 '''),
@@ -1173,9 +1859,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-/**
- * Resizable generic stack backed by an array.
- */
 public class GenericStack<T> implements Iterable<T> {
     @SuppressWarnings("unchecked")
     private T[] data = (T[]) new Object[4];
@@ -1187,19 +1870,16 @@ public class GenericStack<T> implements Iterable<T> {
     }
 
     public T pop() {
-        if (size == 0) throw new NoSuchElementException("Stack is empty");
-        T item = data[--size];
-        data[size] = null; // help GC
-        return item;
+        if (size == 0) throw new NoSuchElementException();
+        T item = data[--size]; data[size] = null; return item;
     }
 
     public T peek() {
-        if (size == 0) throw new NoSuchElementException("Stack is empty");
+        if (size == 0) throw new NoSuchElementException();
         return data[size - 1];
     }
 
     public int size() { return size; }
-    public boolean isEmpty() { return size == 0; }
 
     @Override
     public Iterator<T> iterator() {
@@ -1220,9 +1900,6 @@ public class GenericStack<T> implements Iterable<T> {
 }
 '''),
             ("binary_tree", "Binary search tree", '''
-/**
- * Binary search tree with insert, search, and in-order traversal.
- */
 public class BinaryTree {
     private record Node(int value, Node left, Node right) {
         Node withLeft(Node l) { return new Node(value, l, right); }
@@ -1237,7 +1914,7 @@ public class BinaryTree {
         if (node == null) return new Node(value, null, null);
         if (value < node.value) return node.withLeft(insert(node.left, value));
         if (value > node.value) return node.withRight(insert(node.right, value));
-        return node; // duplicate
+        return node;
     }
 
     public boolean contains(int value) { return contains(root, value); }
@@ -1259,825 +1936,11 @@ public class BinaryTree {
 
     public static void main(String[] args) {
         BinaryTree tree = new BinaryTree();
-        int[] values = {5, 3, 7, 1, 4, 6, 8};
-        for (int v : values) tree.insert(v);
-        tree.inOrder();  // 1 2 3 4 5 6 7 8
+        for (int v : new int[]{5, 3, 7, 1, 4, 6, 8}) tree.insert(v);
+        tree.inOrder();
         System.out.println("Contains 4: " + tree.contains(4));
-        System.out.println("Contains 9: " + tree.contains(9));
     }
 }
-'''),
-        ],
-    },
-
-    "kotlin": {
-        "ext": "kt",
-        "snippets": [
-            ("sealed_state_machine", "Sealed class state machine", '''
-/**
- * Models a network request lifecycle using Kotlin sealed classes.
- */
-sealed class NetworkState<out T> {
-    data object Idle : NetworkState<Nothing>()
-    data object Loading : NetworkState<Nothing>()
-    data class Success<T>(val data: T) : NetworkState<T>()
-    data class Error(val message: String, val code: Int = -1) : NetworkState<Nothing>()
-}
-
-fun <T> NetworkState<T>.fold(
-    onIdle: () -> String = { "Idle" },
-    onLoading: () -> String = { "Loading..." },
-    onSuccess: (T) -> String,
-    onError: (String, Int) -> String = { msg, code -> "Error($code): $msg" }
-): String = when (this) {
-    is NetworkState.Idle -> onIdle()
-    is NetworkState.Loading -> onLoading()
-    is NetworkState.Success -> onSuccess(data)
-    is NetworkState.Error -> onError(message, code)
-}
-
-data class User(val name: String, val email: String)
-
-fun main() {
-    val states = listOf(
-        NetworkState.Idle,
-        NetworkState.Loading,
-        NetworkState.Success(User("Sam", "sam@example.com")),
-        NetworkState.Error("Not Found", 404)
-    )
-
-    states.forEach { state ->
-        val display = state.fold(
-            onSuccess = { user -> "Got user: ${user.name} (${user.email})" }
-        )
-        println(display)
-    }
-}
-'''),
-            ("coroutine_flow", "Kotlin Flow example", '''
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-
-/**
- * Demonstrates Kotlin coroutine Flows — reactive data streams.
- */
-
-// Simulate a sensor emitting temperature readings
-fun temperatureSensor(): Flow<Double> = flow {
-    val base = 20.0
-    var i = 0
-    while (true) {
-        emit(base + (i % 10) * 0.5 + Math.random() * 2)
-        i++
-        delay(100)
-    }
-}
-
-fun main() = runBlocking {
-    println("Temperature monitoring (5 readings, smoothed):")
-
-    temperatureSensor()
-        .take(10)
-        .windowed(3) // sliding window of 3
-        .map { window -> window.average() } // moving average
-        .collect { avg ->
-            println("  Avg temp: ${"%.2f".format(avg)}°C")
-        }
-}
-
-// Extension: sliding window on Flow
-fun Flow<Double>.windowed(size: Int): Flow<List<Double>> = flow {
-    val buffer = mutableListOf<Double>()
-    collect { value ->
-        buffer.add(value)
-        if (buffer.size >= size) {
-            emit(buffer.toList())
-            buffer.removeAt(0)
-        }
-    }
-}
-'''),
-        ],
-    },
-
-    "bash": {
-        "ext": "sh",
-        "snippets": [
-            ("file_organizer", "File organizer by extension", '''
-#!/usr/bin/env bash
-# Organizes files in a directory into subdirectories by extension.
-# Usage: ./file_organizer.sh [directory]
-
-set -euo pipefail
-
-DIR="${1:-.}"
-
-if [[ ! -d "$DIR" ]]; then
-    echo "Error: '$DIR' is not a directory" >&2
-    exit 1
-fi
-
-declare -A count
-
-while IFS= read -r -d '' file; do
-    ext="${file##*.}"
-    if [[ "$ext" == "$file" || -z "$ext" ]]; then
-        ext="no_extension"
-    fi
-    ext="${ext,,}" # lowercase
-
-    target="$DIR/$ext"
-    mkdir -p "$target"
-    mv "$file" "$target/"
-    count[$ext]=$(( ${count[$ext]:-0} + 1 ))
-done < <(find "$DIR" -maxdepth 1 -type f -print0)
-
-echo "=== Organization complete ==="
-for ext in "${!count[@]}"; do
-    printf "  %-15s %d files\\n" "$ext" "${count[$ext]}"
-done
-'''),
-            ("parallel_ping", "Parallel host availability checker", '''
-#!/usr/bin/env bash
-# Check availability of multiple hosts in parallel.
-# Usage: ./parallel_ping.sh host1 host2 host3 ...
-
-set -euo pipefail
-
-TIMEOUT=2
-MAX_PARALLEL=10
-
-RED=\'\\033[0;31m\'
-GREEN=\'\\033[0;32m\'
-NC=\'\\033[0m\'
-
-check_host() {
-    local host="$1"
-    if ping -c 1 -W "$TIMEOUT" "$host" &>/dev/null; then
-        printf "${GREEN}%-30s UP${NC}\\n" "$host"
-    else
-        printf "${RED}%-30s DOWN${NC}\\n" "$host"
-    fi
-}
-
-hosts=("${@:-google.com github.com example.com localhost}")
-
-echo "Checking ${#hosts[@]} hosts (timeout: ${TIMEOUT}s)..."
-echo "---"
-
-pids=()
-for host in "${hosts[@]}"; do
-    check_host "$host" &
-    pids+=($!)
-
-    # Throttle parallelism
-    if (( ${#pids[@]} >= MAX_PARALLEL )); then
-        wait "${pids[0]}"
-        pids=("${pids[@]:1}")
-    fi
-done
-
-# Wait for remaining
-for pid in "${pids[@]}"; do
-    wait "$pid"
-done
-
-echo "---"
-echo "Done."
-'''),
-        ],
-    },
-
-    "r": {
-        "ext": "R",
-        "snippets": [
-            ("statistical_summary", "Statistical summary functions", '''
-# Custom statistical summary functions — beyond base R.
-
-geometric_mean <- function(x) {
-  exp(mean(log(x[x > 0])))
-}
-
-harmonic_mean <- function(x) {
-  n <- length(x[x != 0])
-  n / sum(1 / x[x != 0])
-}
-
-trimmed_summary <- function(x, trim = 0.1) {
-  sorted <- sort(x)
-  n <- length(sorted)
-  lo <- floor(n * trim) + 1
-  hi <- n - floor(n * trim)
-  trimmed <- sorted[lo:hi]
-
-  list(
-    n = length(x),
-    trimmed_n = length(trimmed),
-    mean = mean(trimmed),
-    sd = sd(trimmed),
-    median = median(trimmed),
-    iqr = IQR(trimmed),
-    geometric_mean = geometric_mean(trimmed),
-    harmonic_mean = harmonic_mean(trimmed)
-  )
-}
-
-# Demo with simulated data
-set.seed(42)
-data <- c(rnorm(95, mean = 50, sd = 10), runif(5, 200, 500))  # 5 outliers
-
-cat("=== Raw data summary ===\n")
-print(summary(data))
-
-cat("\n=== Trimmed (10%) summary ===\n")
-result <- trimmed_summary(data, trim = 0.1)
-for (name in names(result)) {
-  cat(sprintf("  %-20s %s\n", paste0(name, ":"), round(result[[name]], 3)))
-}
-'''),
-        ],
-    },
-
-    "lua": {
-        "ext": "lua",
-        "snippets": [
-            ("class_system", "OOP class system via metatables", '''
---- Simple OOP class system using Lua metatables.
-
-local function class(base)
-    local cls = {}
-    cls.__index = cls
-    if base then
-        setmetatable(cls, { __index = base })
-    end
-
-    function cls:new(...)
-        local instance = setmetatable({}, cls)
-        if instance.init then instance:init(...) end
-        return instance
-    end
-
-    return cls
-end
-
--- Base class: Shape
-local Shape = class()
-
-function Shape:init(name)
-    self.name = name or "shape"
-end
-
-function Shape:area()
-    return 0
-end
-
-function Shape:__tostring()
-    return string.format("%s(area=%.2f)", self.name, self:area())
-end
-
--- Circle extends Shape
-local Circle = class(Shape)
-
-function Circle:init(radius)
-    Shape.init(self, "Circle")
-    self.radius = radius
-end
-
-function Circle:area()
-    return math.pi * self.radius ^ 2
-end
-
--- Rectangle extends Shape
-local Rect = class(Shape)
-
-function Rect:init(w, h)
-    Shape.init(self, "Rectangle")
-    self.w = w
-    self.h = h
-end
-
-function Rect:area()
-    return self.w * self.h
-end
-
--- Demo
-local shapes = { Circle:new(5), Rect:new(4, 6), Circle:new(2.5) }
-for _, s in ipairs(shapes) do
-    print(tostring(s))
-end
-'''),
-        ],
-    },
-
-    "perl": {
-        "ext": "pl",
-        "snippets": [
-            ("text_processor", "Text processing pipeline", r'''
-#!/usr/bin/env perl
-# Text processing pipeline: word frequency analysis with regex magic.
-use strict;
-use warnings;
-
-my $text = <<'END';
-To be or not to be that is the question
-Whether tis nobler in the mind to suffer
-The slings and arrows of outrageous fortune
-Or to take arms against a sea of troubles
-And by opposing end them to die to sleep
-END
-
-# Word frequency count (case-insensitive)
-my %freq;
-$freq{lc($_)}++ for ($text =~ /\b(\w+)\b/g);
-
-# Sort by frequency descending, then alphabetically
-my @sorted = sort { $freq{$b} <=> $freq{$a} || $a cmp $b } keys %freq;
-
-printf "%-15s %s\n", "WORD", "COUNT";
-printf "%-15s %s\n", "-" x 15, "-" x 5;
-
-for my $word (@sorted[0..9]) {
-    printf "%-15s %d\n", $word, $freq{$word};
-}
-
-# Bonus: find all words that are palindromes
-my @palindromes = grep { $_ eq reverse $_ && length $_ > 1 } keys %freq;
-print "\nPalindromes found: @palindromes\n" if @palindromes;
-print "Unique words: " . scalar(keys %freq) . "\n";
-'''),
-        ],
-    },
-
-    "php": {
-        "ext": "php",
-        "snippets": [
-            ("collection_pipeline", "Functional collection pipeline", '''
-<?php
-/**
- * Functional collection pipeline — chainable array operations.
- */
-class Collection implements IteratorAggregate, Countable {
-    private array $items;
-
-    public function __construct(array $items = []) {
-        $this->items = array_values($items);
-    }
-
-    public static function of(array $items): self {
-        return new self($items);
-    }
-
-    public function map(callable $fn): self {
-        return new self(array_map($fn, $this->items));
-    }
-
-    public function filter(callable $fn): self {
-        return new self(array_filter($this->items, $fn));
-    }
-
-    public function reduce(callable $fn, mixed $initial = null): mixed {
-        return array_reduce($this->items, $fn, $initial);
-    }
-
-    public function flatMap(callable $fn): self {
-        return new self(array_merge(...array_map($fn, $this->items)));
-    }
-
-    public function take(int $n): self {
-        return new self(array_slice($this->items, 0, $n));
-    }
-
-    public function sortBy(callable $fn): self {
-        $items = $this->items;
-        usort($items, $fn);
-        return new self($items);
-    }
-
-    public function unique(): self {
-        return new self(array_unique($this->items));
-    }
-
-    public function toArray(): array { return $this->items; }
-    public function count(): int { return count($this->items); }
-    public function getIterator(): ArrayIterator { return new ArrayIterator($this->items); }
-}
-
-// Demo: process a list of names
-$result = Collection::of(["Alice", "Bob", "Charlie", "alice", "DAVE", "bob"])
-    ->map(fn($name) => strtolower($name))
-    ->unique()
-    ->filter(fn($name) => strlen($name) > 3)
-    ->sortBy(fn($a, $b) => strcmp($a, $b))
-    ->toArray();
-
-echo "Processed: " . implode(", ", $result) . PHP_EOL;
-// Output: Processed: alice, charlie, dave
-'''),
-        ],
-    },
-
-    "haskell": {
-        "ext": "hs",
-        "snippets": [
-            ("quicksort", "Quicksort with list comprehensions", '''
--- | Elegant quicksort using list comprehensions.
--- Demonstrates Haskell\'s declarative style.
-
-module Main where
-
-quicksort :: (Ord a) => [a] -> [a]
-quicksort []     = []
-quicksort (x:xs) = quicksort smaller ++ [x] ++ quicksort bigger
-  where
-    smaller = [y | y <- xs, y <= x]
-    bigger  = [y | y <- xs, y > x]
-
--- | Merge sort for comparison — stable sort.
-mergesort :: (Ord a) => [a] -> [a]
-mergesort []  = []
-mergesort [x] = [x]
-mergesort xs  = merge (mergesort left) (mergesort right)
-  where
-    (left, right) = splitAt (length xs `div` 2) xs
-    merge [] ys = ys
-    merge xs [] = xs
-    merge (x:xs) (y:ys)
-      | x <= y   = x : merge xs (y:ys)
-      | otherwise = y : merge (x:xs) ys
-
--- | Check if a list is sorted.
-isSorted :: (Ord a) => [a] -> Bool
-isSorted []       = True
-isSorted [_]      = True
-isSorted (x:y:xs) = x <= y && isSorted (y:xs)
-
-main :: IO ()
-main = do
-    let xs = [3, 6, 1, 8, 2, 9, 4, 7, 5]
-    putStrLn $ "Original:   " ++ show xs
-    putStrLn $ "Quicksort:  " ++ show (quicksort xs)
-    putStrLn $ "Mergesort:  " ++ show (mergesort xs)
-    putStrLn $ "Is sorted?  " ++ show (isSorted (quicksort xs))
-'''),
-            ("maybe_monad", "Maybe monad and safe operations", '''
--- | Demonstrates the Maybe monad for safe, composable computations.
-
-module Main where
-
-import Data.Char (digitToInt, isDigit)
-
--- | Safe division that returns Nothing for division by zero.
-safeDiv :: Double -> Double -> Maybe Double
-safeDiv _ 0 = Nothing
-safeDiv x y = Just (x / y)
-
--- | Safe square root for non-negative numbers.
-safeSqrt :: Double -> Maybe Double
-safeSqrt x
-  | x < 0    = Nothing
-  | otherwise = Just (sqrt x)
-
--- | Parse a string as a positive integer.
-safeParseNat :: String -> Maybe Int
-safeParseNat s
-  | null s         = Nothing
-  | all isDigit s  = Just (foldl (\\acc c -> acc * 10 + digitToInt c) 0 s)
-  | otherwise      = Nothing
-
--- | Chain safe operations using do-notation (monadic bind).
-compute :: Double -> Double -> Maybe Double
-compute x y = do
-    ratio  <- safeDiv x y
-    result <- safeSqrt ratio
-    safeDiv result 2.0
-
-main :: IO ()
-main = do
-    putStrLn "Safe computations with Maybe:"
-    print $ compute 100 25    -- Just 1.0
-    print $ compute 100 0     -- Nothing (div by zero)
-    print $ compute (-16) 1   -- Nothing (negative sqrt)
-    putStrLn ""
-    putStrLn "Safe parsing:"
-    print $ safeParseNat "42"   -- Just 42
-    print $ safeParseNat "-5"   -- Nothing
-    print $ safeParseNat ""     -- Nothing
-'''),
-        ],
-    },
-
-    "scala": {
-        "ext": "scala",
-        "snippets": [
-            ("pattern_matching", "Advanced pattern matching", '''
-/**
- * Demonstrates Scala\'s powerful pattern matching with sealed traits,
- * extractors, and guards.
- */
-object PatternMatching extends App {
-
-  // Algebraic data type for arithmetic expressions
-  sealed trait Expr
-  case class Num(value: Double) extends Expr
-  case class Add(left: Expr, right: Expr) extends Expr
-  case class Mul(left: Expr, right: Expr) extends Expr
-  case class Var(name: String) extends Expr
-
-  type Env = Map[String, Double]
-
-  def eval(expr: Expr, env: Env = Map.empty): Option[Double] = expr match {
-    case Num(v) => Some(v)
-    case Var(name) => env.get(name)
-    case Add(l, r) =>
-      for { a <- eval(l, env); b <- eval(r, env) } yield a + b
-    case Mul(l, r) =>
-      for { a <- eval(l, env); b <- eval(r, env) } yield a * b
-  }
-
-  def simplify(expr: Expr): Expr = expr match {
-    case Add(Num(0), e) => simplify(e)
-    case Add(e, Num(0)) => simplify(e)
-    case Mul(Num(1), e) => simplify(e)
-    case Mul(e, Num(1)) => simplify(e)
-    case Mul(Num(0), _) => Num(0)
-    case Mul(_, Num(0)) => Num(0)
-    case Add(l, r)      => Add(simplify(l), simplify(r))
-    case Mul(l, r)      => Mul(simplify(l), simplify(r))
-    case other           => other
-  }
-
-  def prettyPrint(expr: Expr): String = expr match {
-    case Num(v) => if (v == v.toInt) v.toInt.toString else v.toString
-    case Var(n) => n
-    case Add(l, r) => s"(${prettyPrint(l)} + ${prettyPrint(r)})"
-    case Mul(l, r) => s"(${prettyPrint(l)} * ${prettyPrint(r)})"
-  }
-
-  // Demo
-  val expr = Add(Mul(Num(2), Var("x")), Mul(Num(0), Var("y")))
-  val env = Map("x" -> 5.0, "y" -> 3.0)
-
-  println(s"Expression: ${prettyPrint(expr)}")
-  println(s"Simplified: ${prettyPrint(simplify(expr))}")
-  println(s"Evaluated:  ${eval(expr, env)}")
-}
-'''),
-        ],
-    },
-
-    "swift": {
-        "ext": "swift",
-        "snippets": [
-            ("protocol_oriented", "Protocol-oriented design", '''
-import Foundation
-
-/// Protocol-oriented design: composable, testable geometry.
-
-protocol Shape {
-    var area: Double { get }
-    var perimeter: Double { get }
-    var description: String { get }
-}
-
-extension Shape {
-    var description: String {
-        String(format: "%@ — area: %.2f, perimeter: %.2f",
-               String(describing: type(of: self)), area, perimeter)
-    }
-}
-
-struct Circle: Shape {
-    let radius: Double
-    var area: Double { .pi * radius * radius }
-    var perimeter: Double { 2 * .pi * radius }
-}
-
-struct Rectangle: Shape {
-    let width: Double
-    let height: Double
-    var area: Double { width * height }
-    var perimeter: Double { 2 * (width + height) }
-}
-
-struct Triangle: Shape {
-    let a: Double, b: Double, c: Double
-    var perimeter: Double { a + b + c }
-    var area: Double {
-        let s = perimeter / 2
-        return (s * (s - a) * (s - b) * (s - c)).squareRoot()
-    }
-}
-
-// Generic function works with any Shape
-func largest<S: Shape>(_ shapes: [S]) -> S? {
-    shapes.max(by: { $0.area < $1.area })
-}
-
-// Demo
-let shapes: [any Shape] = [
-    Circle(radius: 5),
-    Rectangle(width: 8, height: 6),
-    Triangle(a: 3, b: 4, c: 5)
-]
-
-for shape in shapes {
-    print(shape.description)
-}
-'''),
-        ],
-    },
-
-    "zig": {
-        "ext": "zig",
-        "snippets": [
-            ("array_list", "Dynamic array implementation", '''
-const std = @import("std");
-const Allocator = std.mem.Allocator;
-
-/// A simplified dynamic array (ArrayList) implementation in Zig.
-fn ArrayList(comptime T: type) type {
-    return struct {
-        const Self = @This();
-
-        items: []T,
-        capacity: usize,
-        len: usize,
-        allocator: Allocator,
-
-        pub fn init(allocator: Allocator) Self {
-            return .{
-                .items = &[_]T{},
-                .capacity = 0,
-                .len = 0,
-                .allocator = allocator,
-            };
-        }
-
-        pub fn deinit(self: *Self) void {
-            if (self.capacity > 0) {
-                self.allocator.free(self.items.ptr[0..self.capacity]);
-            }
-        }
-
-        pub fn append(self: *Self, item: T) !void {
-            if (self.len >= self.capacity) {
-                try self.grow();
-            }
-            self.items.ptr[self.len] = item;
-            self.len += 1;
-            self.items.len = self.len;
-        }
-
-        fn grow(self: *Self) !void {
-            const new_cap = if (self.capacity == 0) 4 else self.capacity * 2;
-            const new_mem = try self.allocator.alloc(T, new_cap);
-            if (self.len > 0) {
-                @memcpy(new_mem[0..self.len], self.items.ptr[0..self.len]);
-            }
-            if (self.capacity > 0) {
-                self.allocator.free(self.items.ptr[0..self.capacity]);
-            }
-            self.items = new_mem[0..self.len];
-            self.capacity = new_cap;
-        }
-    };
-}
-
-pub fn main() !void {
-    const stdout = std.io.getStdOut().writer();
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    var list = ArrayList(i32).init(allocator);
-    defer list.deinit();
-
-    for (0..10) |i| {
-        try list.append(@intCast(i * i));
-    }
-
-    try stdout.print("Squares: ");
-    for (list.items) |item| {
-        try stdout.print("{} ", .{item});
-    }
-    try stdout.print("\\n", .{});
-}
-'''),
-        ],
-    },
-
-    "elixir": {
-        "ext": "ex",
-        "snippets": [
-            ("genserver_counter", "GenServer counter process", '''
-defmodule Counter do
-  @moduledoc """
-  A simple counter implemented as a GenServer.
-  Demonstrates Elixir\'s actor model and OTP patterns.
-  """
-  use GenServer
-
-  # Client API
-
-  def start_link(initial \\\\ 0) do
-    GenServer.start_link(__MODULE__, initial, name: __MODULE__)
-  end
-
-  def increment(amount \\\\ 1), do: GenServer.call(__MODULE__, {:increment, amount})
-  def decrement(amount \\\\ 1), do: GenServer.call(__MODULE__, {:decrement, amount})
-  def value, do: GenServer.call(__MODULE__, :value)
-  def reset, do: GenServer.cast(__MODULE__, :reset)
-
-  # Server callbacks
-
-  @impl true
-  def init(initial), do: {:ok, initial}
-
-  @impl true
-  def handle_call({:increment, amount}, _from, state) do
-    new_state = state + amount
-    {:reply, new_state, new_state}
-  end
-
-  def handle_call({:decrement, amount}, _from, state) do
-    new_state = state - amount
-    {:reply, new_state, new_state}
-  end
-
-  def handle_call(:value, _from, state) do
-    {:reply, state, state}
-  end
-
-  @impl true
-  def handle_cast(:reset, _state) do
-    {:noreply, 0}
-  end
-end
-
-defmodule Pipeline do
-  @moduledoc "Enum pipeline examples — Elixir\'s bread and butter."
-
-  def word_frequencies(text) do
-    text
-    |> String.downcase()
-    |> String.split(~r/[^a-z]+/, trim: true)
-    |> Enum.frequencies()
-    |> Enum.sort_by(fn {_word, count} -> -count end)
-  end
-end
-
-# Demo (script mode)
-text = "to be or not to be that is the question"
-Pipeline.word_frequencies(text)
-|> Enum.each(fn {word, count} ->
-  IO.puts("  #{String.pad_trailing(word, 12)} #{count}")
-end)
-'''),
-            ("pattern_matching", "Pattern matching showcase", '''
-defmodule Shapes do
-  @moduledoc """
-  Pattern matching and guards in Elixir — computing areas
-  of geometric shapes using multiple function clauses.
-  """
-
-  @type shape ::
-    {:circle, number()} |
-    {:rectangle, number(), number()} |
-    {:triangle, number(), number(), number()}
-
-  @spec area(shape()) :: {:ok, float()} | {:error, String.t()}
-  def area({:circle, radius}) when radius > 0 do
-    {:ok, :math.pi() * radius * radius}
-  end
-
-  def area({:rectangle, w, h}) when w > 0 and h > 0 do
-    {:ok, w * h * 1.0}
-  end
-
-  def area({:triangle, a, b, c}) when a > 0 and b > 0 and c > 0 do
-    s = (a + b + c) / 2
-    val = s * (s - a) * (s - b) * (s - c)
-    if val > 0, do: {:ok, :math.sqrt(val)}, else: {:error, "invalid triangle"}
-  end
-
-  def area(_), do: {:error, "invalid shape"}
-
-  def describe(shape) do
-    case area(shape) do
-      {:ok, a} -> "#{inspect(shape)} has area #{Float.round(a, 2)}"
-      {:error, msg} -> "#{inspect(shape)}: #{msg}"
-    end
-  end
-end
-
-shapes = [
-  {:circle, 5},
-  {:rectangle, 4, 6},
-  {:triangle, 3, 4, 5},
-  {:circle, -1}
-]
-
-Enum.each(shapes, fn s -> IO.puts(Shapes.describe(s)) end)
 '''),
         ],
     },
@@ -2087,32 +1950,46 @@ Enum.each(shapes, fn s -> IO.puts(Shapes.describe(s)) end)
 # Generator logic
 # ---------------------------------------------------------------------------
 
+PRETTY_NAMES = {
+    "python": "Python",
+    "r": "R",
+    "javascript": "JavaScript",
+    "typescript": "TypeScript",
+    "go": "Go",
+    "rust": "Rust",
+    "ruby": "Ruby",
+    "c": "C",
+    "java": "Java",
+}
+
+
+def pick_language() -> str:
+    """Weighted random language selection."""
+    langs = list(WEIGHTS.keys())
+    weights = [WEIGHTS[l] for l in langs]
+    return random.choices(langs, weights=weights, k=1)[0]
+
+
 def generate_snippet():
-    """Pick a random language and snippet, write the file, return metadata."""
+    """Pick a weighted-random language and snippet, write the file, return metadata."""
     now = datetime.now(timezone.utc)
     year = now.strftime("%Y")
     date_slug = now.strftime("%m-%d")
 
-    # Pick random language
-    lang_key = random.choice(list(LANGUAGES.keys()))
+    lang_key = pick_language()
     lang = LANGUAGES[lang_key]
     ext = lang["ext"]
 
-    # Pick random snippet
     title, description, code = random.choice(lang["snippets"])
 
-    # Build file path
     filename = f"{date_slug}-{lang_key}.{ext}"
     rel_path = f"snippets/{year}/{filename}"
 
-    # Write file
     os.makedirs(os.path.dirname(rel_path), exist_ok=True)
     with open(rel_path, "w", encoding="utf-8") as f:
         f.write(code.strip() + "\n")
 
-    # Build commit message
-    pretty_lang = lang_key.replace("cpp", "C++").replace("bash", "Bash").replace("typescript", "TypeScript").replace("javascript", "JavaScript").replace("haskell", "Haskell").replace("kotlin", "Kotlin").replace("elixir", "Elixir").replace("python", "Python").replace("ruby", "Ruby").replace("rust", "Rust").replace("scala", "Scala").replace("swift", "Swift")
-    pretty_lang = pretty_lang[0].upper() + pretty_lang[1:] if pretty_lang[0].islower() else pretty_lang
+    pretty_lang = PRETTY_NAMES.get(lang_key, lang_key.capitalize())
     commit_msg = f"Add {description.lower()} in {pretty_lang}"
 
     return {
@@ -2126,6 +2003,5 @@ def generate_snippet():
 
 if __name__ == "__main__":
     result = generate_snippet()
-    # Output for GitHub Actions to consume
     for key, val in result.items():
         print(f"{key}={val}")
