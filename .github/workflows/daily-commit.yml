@@ -1,0 +1,46 @@
+name: Daily Polyglot Snippet
+
+on:
+  schedule:
+    # 14:00 UTC = 10:00 AM ET (9:00 AM during DST)
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate snippet
+        id: gen
+        run: |
+          # Add slight randomness to avoid exact same minute every day
+          SLEEP_SECS=$((RANDOM % 300))
+          echo "Sleeping ${SLEEP_SECS}s for jitter..."
+          sleep $SLEEP_SECS
+
+          OUTPUT=$(python generate.py)
+          echo "$OUTPUT"
+
+          # Parse output into step outputs
+          echo "$OUTPUT" | while IFS='=' read -r key value; do
+            echo "${key}=${value}" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Commit and push
+        run: |
+          git config user.name "Sam Cialek"
+          git config user.email "scialek3@gatech.edu"
+          git add -A
+          git commit -m "${{ steps.gen.outputs.commit_message }}" || echo "Nothing to commit"
+          git push
